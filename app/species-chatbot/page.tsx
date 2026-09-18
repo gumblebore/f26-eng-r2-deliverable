@@ -22,21 +22,15 @@ export default function SpeciesChatbot() {
       return;
     }
 
-    // Build the updated log locally (rather than reading back from state, which
-    // wouldn't be updated yet) so we can send it as this request's history.
-    const updatedLog = [...chatLog, { role: "user" as const, content: trimmed }];
-    setChatLog(updatedLog);
+    setChatLog((log) => [...log, { role: "user", content: trimmed }]);
     setMessage("");
     setIsLoading(true);
 
     try {
-      // Cap at the last 10 messages so the chatbot has recent context without an
-      // ever-growing request body/token cost as the conversation gets long.
-      const history = updatedLog.slice(-10);
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ message: trimmed }),
       });
       const data = (await res.json()) as { response?: string; error?: string };
 
