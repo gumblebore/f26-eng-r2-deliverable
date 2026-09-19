@@ -1,6 +1,7 @@
 "use client";
 
 import { kingdoms, speciesSchema, type SpeciesFormData } from "@/app/species/species-schema";
+import { searchWikipediaSpecies } from "@/app/species/wikipedia";
 import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,12 +46,41 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
   // Control open/closed state of the dialog
   const [open, setOpen] = useState<boolean>(false);
 
+  // Wikipedia search box state, kept separate from the species form below since it isn't
+  // one of the species' own fields.
+  const [wikipediaQuery, setWikipediaQuery] = useState<string>("");
+  const [isSearchingWikipedia, setIsSearchingWikipedia] = useState<boolean>(false);
+
   // Instantiate form functionality with React Hook Form, passing in the Zod schema (for validation) and default values
   const form = useForm<SpeciesFormData>({
     resolver: zodResolver(speciesSchema),
     defaultValues,
     mode: "onChange",
   });
+
+  // Looks up the searched name on Wikipedia and autofills the description and image
+  // fields from the matching article, if one is found.
+  const handleWikipediaSearch = async () => {
+    const query = wikipediaQuery.trim();
+    if (!query) {
+      return;
+    }
+
+    setIsSearchingWikipedia(true);
+    const result = await searchWikipediaSpecies(query);
+    setIsSearchingWikipedia(false);
+
+    if (!result) {
+      return toast({
+        title: "No Wikipedia article found",
+        description: `We couldn't find a Wikipedia article matching "${query}".`,
+        variant: "destructive",
+      });
+    }
+
+    form.setValue("description", result.description, { shouldValidate: true, shouldDirty: true });
+    form.setValue("image", result.image, { shouldValidate: true, shouldDirty: true });
+  };
 
   const onSubmit = async (input: SpeciesFormData) => {
     // The `input` prop contains data that has already been processed by zod. We can now use it in a supabase query
@@ -109,6 +139,21 @@ export default function AddSpeciesDialog({ userId }: { userId: string }) {
             Add a new species here. Click &quot;Add Species&quot; below when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
+        <div className="mb-4 flex gap-2">
+          <Input
+            value={wikipediaQuery}
+            onChange={(e) => setWikipediaQuery(e.target.value)}
+            placeholder="Search Wikipedia to autofill description & image"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isSearchingWikipedia}
+            onClick={() => void handleWikipediaSearch()}
+          >
+            {isSearchingWikipedia ? "Searching..." : "Search"}
+          </Button>
+        </div>
         <Form {...form}>
           <form onSubmit={(e: BaseSyntheticEvent) => void form.handleSubmit(onSubmit)(e)}>
             <div className="grid w-full items-center gap-4">
